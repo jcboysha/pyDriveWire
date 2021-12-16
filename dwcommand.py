@@ -8,6 +8,7 @@ import sys
 import re
 import urlparse
 import tempfile
+import ignition
 
 
 class ParseNode:
@@ -219,6 +220,7 @@ class DWParser:
         self.parseTree.add("telnet", ParseAction(self.doTelnet))
         self.parseTree.add("help", ParseAction(self.ptWalker))
         self.parseTree.add("?", ParseAction(self.ptWalker))
+        self.parseTree.add("gemini", ParseAction(self.doGemini))
 
     def __init__(self, server):
         self.server = server
@@ -440,6 +442,37 @@ class DWParser:
     def doTelnet(self, data):
         return self.doConnect(data, telnet=True, interactive=True)
 
+    def doGemini(self, data):
+        pr = urlparse.urlparse(data)
+        if pr.scheme == 'telnet':
+            d2 = pr.netloc
+            telnet = True
+        # elif pr.scheme == '':
+        else:
+            d2 = data
+        r = d2.split(':')
+        if len(r) == 1:
+            r = d2.split(' ')
+        if len(r) == 1:
+            r.append('23')
+        (host, port) = r
+        print "host (%s)" % host
+        print "port (%s)" % port
+        if not host and not port:
+            raise Exception("gemini: Bad Host/Port: %s" % data)
+        try:
+            response = ignition.request(host)
+            print(response.data())
+
+        except Exception as ex:
+            raise
+            if telnet or interactive:
+                res = {'msg': '\r\nFAIL %s' % str(ex), 'self.cmdClass': 'AT'}
+            else:
+                res = "FAIL %s" % str(ex)
+        return res
+        
+
     def doDial(self, data):
         return self.doConnect(data, telnet=False, interactive=True)
 
@@ -451,7 +484,7 @@ class DWParser:
         # elif pr.scheme == '':
         else:
             d2 = data
-        r = d2.split(':')
+            r = d2.split(':')
         if len(r) == 1:
             r = d2.split(' ')
         if len(r) == 1:
